@@ -1,2 +1,23 @@
-# jj-lessons-website
-A website for people to book jj lessons with me
+# JJ Lessons Website
+
+A one-page lesson booking website built with Vite and React.
+
+## Development
+
+Install dependencies:
+
+```sh
+npm install
+```
+
+Start the local dev server:
+
+```sh
+npm.cmd run dev
+```
+
+Build for production:
+
+```sh
+npm.cmd run build
+```
