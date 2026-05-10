@@ -1,27 +1,19 @@
 import { Fragment, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import './App.css';
-import lessonHero from './assets/lesson-hero.png';
+import bioLeft from './assets/bio-left.png';
+import bioRight from './assets/bio-right.png';
 
 type TimeSlot = {
   id: string;
   day: string;
   date: string;
+  isoDate: string;
   time: string;
   available: boolean;
 };
 
 const recipientEmail = 'jrvafiades@gmail.com';
-
-const days = [
-  { day: 'Sun', date: 'May 10' },
-  { day: 'Mon', date: 'May 11' },
-  { day: 'Tue', date: 'May 12' },
-  { day: 'Wed', date: 'May 13' },
-  { day: 'Thu', date: 'May 14' },
-  { day: 'Fri', date: 'May 15' },
-  { day: 'Sat', date: 'May 16' },
-];
 
 const times = [
   '8:00 AM',
@@ -42,31 +34,75 @@ const times = [
 
 const unavailableSlots = new Set(['Tue-10:00 AM', 'Thu-2:00 PM', 'Fri-12:00 PM', 'Sat-9:00 AM']);
 
+const dayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
+const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+
+const getStartOfWeek = (date: Date) => {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - start.getDay());
+  return start;
+};
+
+const addDays = (date: Date, daysToAdd: number) => {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + daysToAdd);
+  return nextDate;
+};
+
+const getIsoDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 function App() {
+  const currentWeekStart = useMemo(() => getStartOfWeek(new Date()), []);
+  const currentDayIso = useMemo(() => getIsoDate(new Date()), []);
+  const [weekStart, setWeekStart] = useState(() => getStartOfWeek(new Date()));
   const [selectedSlotId, setSelectedSlotId] = useState('');
   const [contact, setContact] = useState('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState('');
 
+  const days = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, dayOffset) => {
+        const date = addDays(weekStart, dayOffset);
+
+        return {
+          day: dayFormatter.format(date),
+          date: dateFormatter.format(date),
+          isoDate: getIsoDate(date),
+        };
+      }),
+    [weekStart],
+  );
+
   const slots = useMemo<TimeSlot[]>(
     () =>
-      days.flatMap(({ day, date }) =>
+      days.flatMap(({ day, date, isoDate }) =>
         times.map((time) => {
-          const id = `${day}-${time}`;
+          const id = `${isoDate}-${time}`;
+          const availabilityKey = `${day}-${time}`;
+          const isPastDay = isoDate < currentDayIso;
 
           return {
             id,
             day,
             date,
+            isoDate,
             time,
-            available: !unavailableSlots.has(id),
+            available: !isPastDay && !unavailableSlots.has(availabilityKey),
           };
         }),
       ),
-    [],
+    [currentDayIso, days],
   );
 
   const selectedSlot = slots.find((slot) => slot.id === selectedSlotId);
+  const canViewPreviousWeek = weekStart.getTime() > currentWeekStart.getTime();
   const mailtoHref = selectedSlot
     ? `mailto:${recipientEmail}?subject=${encodeURIComponent('Lesson booking request')}&body=${encodeURIComponent(
         `Selected lesson time: ${selectedSlot.day}, ${selectedSlot.date} at ${selectedSlot.time} for 1 hour\nContact: ${contact}\nNotes: ${notes || 'None'}`,
@@ -87,32 +123,48 @@ function App() {
     }, 700);
   };
 
+  const changeWeek = (weekOffset: number) => {
+    setWeekStart((visibleWeekStart) => addDays(visibleWeekStart, weekOffset * 7));
+    setSelectedSlotId('');
+    setStatus('');
+  };
+
+  const showPreviousWeek = () => {
+    if (!canViewPreviousWeek) {
+      return;
+    }
+
+    changeWeek(-1);
+  };
+
   return (
     <main className="page-shell">
       <section className="intro">
-        <img className="intro-image" src={lessonHero} alt="A bright teaching desk with a calendar and lesson notes" />
+        <img className="intro-image" src={bioLeft} alt="James Vafiades having his hand raised after a jiu-jitsu match" />
         <div className="intro-copy">
           <p className="eyebrow">Private lessons</p>
-          <h1>Focused lessons built around your pace.</h1>
+          <h1>Bio</h1>
           <p>
-            Book a one-on-one session for thoughtful instruction, clear practice goals, and a steady path from
-            where you are now to the next thing you want to learn.
+            My name is James Vafiades, and I'm a jiu jitsu black belt with more than 12 years of experience. I've competed at the highest levels and learned from the best in the sport.
+            My passion is sharing what I've learned with other grapplers.
+            If you want to take your jiu jitsu to the next level, then book a private lesson with me in South Boston.
           </p>
         </div>
+        <img className="intro-image" src={bioRight} alt="James Vafiades celebrating after a jiu-jitsu match" />
       </section>
 
       <section className="booking" aria-labelledby="booking-title">
         <div className="booking-header">
           <div>
             <p className="eyebrow">Schedule</p>
-            <h2 id="booking-title">book a lesson today</h2>
+            <h2 id="booking-title">book a lesson today.</h2>
           </div>
           <div className="calendar-controls" aria-label="Calendar navigation">
-            <button type="button" aria-label="Previous week">
-              ‹
+            <button type="button" aria-label="Previous week" onClick={showPreviousWeek} disabled={!canViewPreviousWeek}>
+              &lsaquo;
             </button>
-            <button type="button" aria-label="Next week">
-              ›
+            <button type="button" aria-label="Next week" onClick={() => changeWeek(1)}>
+              &rsaquo;
             </button>
           </div>
         </div>
@@ -133,8 +185,8 @@ function App() {
 
           <div className="calendar" role="grid" aria-label="Available lesson times">
             <div className="time-gutter" aria-hidden="true" />
-            {days.map(({ day, date }) => (
-              <div className="day-heading" key={day} role="columnheader">
+            {days.map(({ day, date, isoDate }) => (
+              <div className="day-heading" key={isoDate} role="columnheader">
                 <span>{day}</span>
                 <strong>{date}</strong>
               </div>
@@ -145,8 +197,8 @@ function App() {
                 <div className="time-label" key={`${time}-label`}>
                   {time}
                 </div>
-                {days.map(({ day, date }) => {
-                  const slot = slots.find((item) => item.day === day && item.time === time);
+                {days.map(({ isoDate }) => {
+                  const slot = slots.find((item) => item.isoDate === isoDate && item.time === time);
 
                   if (!slot) {
                     return null;
@@ -165,7 +217,7 @@ function App() {
                       aria-pressed={selectedSlotId === slot.id}
                     >
                       <span>{slot.available ? `${time} - 1 hr` : 'Busy'}</span>
-                      <small>{date}</small>
+                      <small>{slot.date}</small>
                     </button>
                   );
                 })}
